@@ -12,6 +12,7 @@ import torch.nn as nn
 import torch.optim
 
 from .vgg16 import VGG16
+from .alexnet import AlexNet
 
 
 logger = getLogger()
@@ -75,7 +76,7 @@ class Net(nn.Module):
         return x
 
 
-def model_factory(sobel, relu=False, num_classes=0, batch_norm=True):
+def model_factory(arch, sobel, relu=False, num_classes=0, batch_norm=True):
     """
     Create a network.
     """
@@ -84,7 +85,11 @@ def model_factory(sobel, relu=False, num_classes=0, batch_norm=True):
     padding = nn.ConstantPad2d(1, 0.0)
     if sobel:
         padding = nn.ConstantPad2d(2, 0.0)
-    body = VGG16(dim_in, relu=relu, batch_norm=batch_norm)
+
+    if arch == 'vgg16':
+        body = VGG16(dim_in, relu=relu, batch_norm=batch_norm)
+    elif arch == 'alexnet':
+        body = AlexNet(dim_in, batch_norm=batch_norm)
 
     pred_layer = nn.Linear(body.dim_output_space, num_classes) if num_classes else None
 

@@ -17,7 +17,8 @@ from src.model.model_factory import create_sobel_layer
 from src.model.vgg16 import VGG16
 
 logger = getLogger()
-
+MODEL_STATE_DICT_KEYS = ['state_dict', 'net']
+KEYS_TO_REMOVE_FROM_STATE_DICT = ['sobel.0', 'sobel.1', 'top_layer', 'pred_layer']
 
 def load_pretrained(model, args):
     """
@@ -33,25 +34,28 @@ def load_pretrained(model, args):
         map_location = "cuda:" + str(args.gpu_to_work_on)
     checkpoint = torch.load(args.pretrained, map_location=map_location)
 
+    # shortcut for model state dict in the checkpoint
+    state_dict = None
+    for key in MODEL_STATE_DICT_KEYS:
+        if key in checkpoint:
+            state_dict = checkpoint[key]
+    if state_dict is None:
+        raise KeyError('Cannot find a state dict for a model in the checkpoint dictionary.')
+
     # clean keys from 'module'
-    checkpoint['state_dict'] = {rename_key(key): val
-                                for key, val
-                                in checkpoint['state_dict'].items()}
+    state_dict = {rename_key(key): val
+                    for key, val
+                    in state_dict.items()}
 
-    # remove sobel keys
-    if 'sobel.0.weight' in checkpoint['state_dict']:
-        del checkpoint['state_dict']['sobel.0.weight']
-        del checkpoint['state_dict']['sobel.0.bias']
-        del checkpoint['state_dict']['sobel.1.weight']
-        del checkpoint['state_dict']['sobel.1.bias']
-
-    # remove pred_layer keys
-    if 'pred_layer.weight' in checkpoint['state_dict']:
-        del checkpoint['state_dict']['pred_layer.weight']
-        del checkpoint['state_dict']['pred_layer.bias']
+    # remove undesired keys
+    for key in KEYS_TO_REMOVE_FROM_STATE_DICT:
+        if '{}.weight'.format(key) in state_dict:
+            del state_dict['{}.weight'.format(key)]
+        if '{}.bias'.format(key) in state_dict:
+            del state_dict['{}.bias'.format(key)]
 
     # load weights
-    model.body.load_state_dict(checkpoint['state_dict'])
+    model.body.load_state_dict(state_dict)
     logger.info("=> loaded pretrained weights from '{}'".format(args.pretrained))
 
 

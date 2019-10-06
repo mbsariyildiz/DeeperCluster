@@ -35,6 +35,9 @@ parser.add_argument('--split', type=str, required=False, default='train',
                     choices=['train', 'trainval'], help='training split')
 parser.add_argument('--sobel', type=bool_flag, default=False, help='If true, sobel applies')
 
+# architecture params
+parser.add_argument('--arch', type=str, default='vgg16')
+
 # transfer params
 parser.add_argument('--fc6_8', type=bool_flag, default=True, help='If true, train only the final classifier')
 parser.add_argument('--eval_random_crops', type=bool_flag, default=True, help='If true, eval on 10 random crops, otherwise eval on 10 fixed crops')
@@ -55,7 +58,7 @@ def main():
     fix_random_seeds(args.seed)
 
     # create model
-    model = model_factory(args, relu=True, num_classes=20)
+    model = model_factory(args.arch, args.sobel, relu=True, num_classes=20)
 
     # load pretrained weights
     load_pretrained(model, args)
@@ -80,7 +83,7 @@ def main():
 
     loader = torch.utils.data.DataLoader(dataset,
          batch_size=16, shuffle=False,
-         num_workers=4, pin_memory=True)
+         num_workers=16, pin_memory=True)
     print('PASCAL VOC 2007 ' + args.split + ' dataset loaded')
 
     # re initialize classifier
@@ -149,7 +152,7 @@ def main():
         train_dataset,
         batch_size=1,
         shuffle=False,
-        num_workers=4,
+        num_workers=8,
         pin_memory=True,
     )
     evaluate(train_loader, model, args.eval_random_crops)
@@ -160,7 +163,7 @@ def main():
         test_dataset,
         batch_size=1,
         shuffle=False,
-        num_workers=4,
+        num_workers=8,
         pin_memory=True,
     )
     evaluate(test_loader, model, args.eval_random_crops)

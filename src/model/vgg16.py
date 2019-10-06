@@ -4,16 +4,15 @@
 # This source code is licensed under the license found in the
 # LICENSE file in the root directory of this source tree.
 #
-
 import math
-
 import torch
 import torch.nn as nn
-import torch.nn.init as init
+
 
 cfg = {
     'D': [64, 64, 'M', 128, 128, 'M', 256, 256, 256, 'M', 512, 512, 512, 'M', 512, 512, 512, 'M'],
 }
+
 
 class VGG16(nn.Module):
     '''
