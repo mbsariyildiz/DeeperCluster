@@ -38,6 +38,17 @@ def bool_flag(s):
     else:
         raise argparse.ArgumentTypeError("invalid value for a boolean flag")
 
+def _find_free_port():
+    import socket
+
+    sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    # Binding to port 0 will cause the OS to find an available port for us
+    sock.bind(("", 0))
+    port = sock.getsockname()[1]
+    sock.close()
+    # NOTE: there is still a chance the port could be taken by other processes.
+    return port
+
 
 def init_distributed_mode(args, make_communication_groups=True):
     """
@@ -67,7 +78,9 @@ def init_distributed_mode(args, make_communication_groups=True):
         args.world_size = int(os.environ['WORLD_SIZE'])
 
     # prepare distributed
-    dist.init_process_group(backend='nccl', init_method=args.dist_url,
+    port = _find_free_port()
+    dist_url = f"tcp://127.0.0.1:{port}"
+    dist.init_process_group(backend='nccl', init_method=dist_url,
                             world_size=args.world_size, rank=args.rank)
 
     # set cuda device
