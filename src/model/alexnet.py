@@ -10,20 +10,33 @@ import torch.nn as nn
 
  
 CFG = {
-    '2012': [(96, 11, 4, 2), 'M', (256, 5, 1, 2), 'M', (384, 3, 1, 1), (384, 3, 1, 1), (256, 3, 1, 1), 'M']
+    '2012': [(96, 11, 4, 2), 'M', (256, 5, 1, 2), 'M', (384, 3, 1, 1), (384, 3, 1, 1), (256, 3, 1, 1), 'M'],
+    'gidaris': [(64, 11, 4, 2), 'M', (192, 5, 1, 2), 'M', (384, 3, 1, 1), (256, 3, 1, 1), (256, 3, 1, 1), 'M']
 }
 
 
 class AlexNet(nn.Module):
-    def __init__(self, dim_in, batch_norm=True):
+    def __init__(self, dim_in, batch_norm=True, arch_config="2012"):
         super(AlexNet, self).__init__()
-        self.features = make_layers_features(CFG['2012'], dim_in, bn=batch_norm)
-        self.classifier = nn.Sequential(nn.Dropout(0.5),
-                            nn.Linear(256 * 6 * 6, 4096),
-                            nn.ReLU(inplace=True),
-                            nn.Dropout(0.5),
-                            nn.Linear(4096, 4096),
-                            nn.ReLU(inplace=True))
+        self.features = make_layers_features(CFG[arch_config], dim_in, bn=batch_norm)
+
+        if arch_config == "2012":
+            self.classifier = nn.Sequential(
+                nn.Dropout(0.5),
+                nn.Linear(256 * 6 * 6, 4096),
+                nn.ReLU(inplace=True),
+                nn.Dropout(0.5),
+                nn.Linear(4096, 4096),
+                nn.ReLU(inplace=True))
+        elif arch_config == "gidaris":
+            self.classifier = nn.Sequential(
+                nn.Linear(256 * 6 * 6, 4096, bias=False),
+                nn.BatchNorm1d(4096),
+                nn.ReLU(inplace=True),
+                nn.Linear(4096, 4096, bias=False),
+                nn.BatchNorm1d(4096),
+                nn.ReLU(inplace=True))
+
         self.dim_output_space = 4096
         self._initialize_weights()
 
@@ -43,10 +56,12 @@ class AlexNet(nn.Module):
                     m.bias.data.zero_()
             elif isinstance(m, nn.BatchNorm2d):
                 m.weight.data.fill_(1)
-                m.bias.data.zero_()
+                if m.bias is not None:
+                    m.bias.data.zero_()
             elif isinstance(m, nn.Linear):
                 m.weight.data.normal_(0, 0.01)
-                m.bias.data.zero_()
+                if m.bias is not None:
+                    m.bias.data.zero_()
 
 
 def make_layers_features(cfg, input_dim, bn):

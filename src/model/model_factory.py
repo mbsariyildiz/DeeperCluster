@@ -13,6 +13,7 @@ import torch.optim
 
 from .vgg16 import VGG16
 from .alexnet import AlexNet
+# from .alexnet_gidaris import AlexNetGidaris
 
 
 logger = getLogger()
@@ -89,7 +90,10 @@ def model_factory(arch, sobel, relu=False, num_classes=0, batch_norm=True):
     if arch == 'vgg16':
         body = VGG16(dim_in, relu=relu, batch_norm=batch_norm)
     elif arch == 'alexnet':
-        body = AlexNet(dim_in, batch_norm=batch_norm)
+        body = AlexNet(dim_in, batch_norm=batch_norm, arch_config="2012")
+    elif arch == 'alexnet_gidaris':
+        # we assume that sobel if false
+        body = AlexNet(dim_in, batch_norm=batch_norm, arch_config="gidaris")
 
     pred_layer = nn.Linear(body.dim_output_space, num_classes) if num_classes else None
 
@@ -122,9 +126,12 @@ def to_cuda(net, gpu_id, apex=False, group=None):
         from apex.parallel import DistributedDataParallel as DDP
         net = DDP(net, delay_allreduce=True)
     else:
+        if not isinstance(gpu_id, list):
+            gpu_id = [gpu_id]
+
         net = nn.parallel.DistributedDataParallel(
             net,
-            device_ids=[gpu_id],
+            device_ids=gpu_id,
             process_group=group,
         )
     return net
