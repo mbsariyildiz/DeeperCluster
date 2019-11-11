@@ -44,6 +44,7 @@ def get_parser():
                         help='First iter to run in the current epoch')
 
     # model params
+    parser.add_argument('--arch', type=str, default='vgg16')
     parser.add_argument('--pretrained', type=str, default='',
                         help='Use this instead of random weights.')
     parser.add_argument('--conv', type=int, default=1, choices=[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13],
@@ -71,6 +72,7 @@ def get_parser():
                         Default None: no cross validation: train on full train set""")
     parser.add_argument('--cross_valid', type=int, default=None,
                         help='between 0 and kfold - 1: index of the round of cross validation')
+    parser.add_argument('--seed', type=int, default=1993, help='random seed')
 
     # distributed training params
     parser.add_argument('--rank', default=0, type=int,
@@ -140,8 +142,8 @@ def main(args):
     val_dataset.transform = tr_val
 
     # build model skeleton
-    fix_random_seeds()
-    model = model_factory(args)
+    fix_random_seeds(args.seed)
+    model = model_factory(args.arch, args.sobel)
 
     load_pretrained(model, args)
 
@@ -156,12 +158,13 @@ def main(args):
     else:
         nmb_classes = 1000
 
-    reglog = RegLog(nmb_classes, args.conv)
+    reglog = RegLog(args.arch, nmb_classes, args.conv)
 
     # distributed training wrapper
-    model = to_cuda(model, [args.gpu_to_work_on], apex=True)
-    reglog = to_cuda(reglog, [args.gpu_to_work_on], apex=True)
+    model = to_cuda(model, [args.gpu_to_work_on], apex=False)
+    reglog = to_cuda(reglog, [args.gpu_to_work_on], apex=False)
     logger.info('model to cuda')
+
 
     # set optimizer
     optimizer = sgd_optimizer(reglog, args.lr, args.wd)
@@ -234,30 +237,40 @@ def evaluate_pascal(val_dataset, models):
         # Subtract eps from score to make AP work for tied scores
         ap = metrics.average_precision_score(gts[i][gts[i]<=1], scr[i][gts[i]<=1]-1e-5*gts[i][gts[i]<=1])
         aps.append(ap)
-    print(np.mean(aps), '  ', ' '.join(['%0.2f'%a for a in aps]))
+    logger.info("{} - {}".format(np.mean(aps), ' '.join(['%0.2f' % a for a in aps])))
     return np.mean(aps), 0
 
 
 class RegLog(nn.Module):
     """Creates logistic regression on top of frozen features"""
-    def __init__(self, num_labels, conv):
+    def __init__(self, arch, num_labels, conv):
         super(RegLog, self).__init__()
-        if conv < 3:
-            av = 18
-            s = 9216
-        elif conv < 5:
-            av = 14
-            s = 8192
-        elif conv < 8:
-            av = 9
-            s = 9216
-        elif conv < 11:
-            av = 6
-            s = 8192
-        elif conv < 14:
-            av = 3
-            s = 8192
-        self.av_pool = nn.AvgPool2d(av, stride=av, padding=0)
+        if arch == "vgg16":
+            if conv < 3:
+                av = 18
+                s = 9216
+            elif conv < 5:
+                av = 14
+                s = 8192
+            elif conv < 8:
+                av = 9
+                s = 9216
+            elif conv < 11:
+                av = 6
+                s = 8192
+            elif conv < 14:
+                av = 3
+                s = 8192
+
+            self.av_pool = nn.AvgPool2d(av, stride=av, padding=0)
+
+        elif arch.startswith("alexnet"):
+            if conv == 5:
+                av = 6
+                s = 9216
+
+            self.av_pool = nn.AdaptiveAvgPool2d(av)
+
         self.linear = nn.Linear(s, num_labels)
 
     def forward(self, x):
