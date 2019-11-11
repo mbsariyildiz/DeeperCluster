@@ -27,6 +27,7 @@ parser = argparse.ArgumentParser()
 # model params
 parser.add_argument('--pretrained', type=str, required=False, default='',
                     help='evaluate this model')
+parser.add_argument('--seed', type=int, default=1993, help='random seed')
 
 # data params
 parser.add_argument('--data_path', type=str, default='',
@@ -48,7 +49,6 @@ parser.add_argument('--stepsize', type=int, default=10000, help='Decay step')
 parser.add_argument('--lr', type=float, required=False, default=0.003, help='learning rate')
 parser.add_argument('--wd', type=float, required=False, default=1e-6, help='weight decay')
 
-parser.add_argument('--seed', type=int, default=1993, help='random seed')
 
 def main():
     args = parser.parse_args()
@@ -91,11 +91,13 @@ def main():
         for m in model.body.classifier.modules():
             if isinstance(m, nn.Linear):
                 m.weight.data.normal_(0, 0.01)
-                m.bias.data.fill_(0.1)
+                if m.bias is not None:
+                    m.bias.data.fill_(0.1)
     for m in model.pred_layer.modules():
         if isinstance(m, nn.Linear):
             m.weight.data.normal_(0, 0.01)
-            m.bias.data.fill_(0.1)
+            if m.bias is not None:
+                m.bias.data.fill_(0.1)
 
    # freeze conv layers
     if args.fc6_8:
